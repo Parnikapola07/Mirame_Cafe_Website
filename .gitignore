@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Flask/Python
+__pycache__/
+*.pyc
+instance/
+.venv/
+env/
+venv/
