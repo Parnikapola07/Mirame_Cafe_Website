@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mirame Cafe & Kitchen{% endblock %}</title>
+
+    <!-- Alpine.js for interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        espresso: '#2C1E16',
+                        cream: '#FAF7F2',
+                        gold: '#D4AF37',
+                        lightgold: '#F5E6B3',
+                        overlay: 'rgba(44, 30, 22, 0.6)'
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    boxShadow: {
+                        'premium': '0 10px 30px -10px rgba(44, 30, 22, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+        rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+    <!-- ScrollReveal JS -->
+    <script src="https://unpkg.com/scrollreveal"></script>
+</head>
+
+<body class="bg-cream text-espresso font-sans antialiased overflow-x-hidden flex flex-col min-h-screen">
+
+    <!-- Flash Messages Toast -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-3">
+        {% for category, message in messages %}
+        <div class="toast-message bg-white shadow-premium rounded-lg px-6 py-4 flex items-center gap-3 border-l-4 border-gold transform transition-all duration-500 translate-y-0 opacity-100"
+            x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
+            {% if category == 'success' %}
+            <i class="fa-solid fa-check-circle text-gold text-xl"></i>
+            {% else %}
+            <i class="fa-solid fa-info-circle text-gold text-xl"></i>
+            {% endif %}
+            <p class="font-medium">{{ message }}</p>
+            <button @click="show = false" class="ml-4 text-gray-400 hover:text-espresso transition"><i
+                    class="fa-solid fa-xmark"></i></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Navigation Bar -->
+    <header x-data="{ scrolled: false, mobileMenuOpen: false }"
+        @scroll.window="scrolled = (window.pageYOffset > ('{{ request.endpoint }}' === 'home' ? window.innerHeight - 80 : 50))"
+        :class="{'bg-white/95 backdrop-blur-md shadow-sm py-3': scrolled, 'bg-transparent py-5': !scrolled}"
+        class="fixed w-full top-0 z-40 transition-all duration-300">
+
+        <div class="container mx-auto px-6 lg:px-12 flex justify-between items-center">
+
+            <!-- Logo -->
+            <a href="{{ url_for('home') }}" class="flex items-center gap-2 z-50">
+                <span class="font-serif text-2xl font-bold tracking-wide transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white': !scrolled}">
+                    Mírame
+                </span>
+            </a>
+
+            <!-- Desktop Menu -->
+            <nav class="hidden md:flex items-center gap-8 font-medium">
+                <a href="{{ url_for('home') }}" class="nav-link hover:text-gold transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">Home</a>
+                <a href="{{ url_for('menu') }}" class="nav-link hover:text-gold transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">Menu</a>
+                <a href="{{ url_for('gallery') }}" class="nav-link hover:text-gold transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">Gallery</a>
+                <a href="{{ url_for('about') }}" class="nav-link hover:text-gold transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">About</a>
+                <a href="{{ url_for('contact') }}" class="nav-link hover:text-gold transition-colors duration-300"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">Contact</a>
+                <a href="{{ url_for('order') }}" class="nav-link hover:text-gold transition-colors duration-300 md:mr-4"
+                    :class="{'text-espresso': scrolled, 'text-white/90': !scrolled}">Order Online</a>
+                <a href="{{ url_for('reservation') }}" class="btn-primary transition-all duration-300">Reserve Table</a>
+            </nav>
+
+            <!-- Mobile Menu Toggle -->
+            <button @click="mobileMenuOpen = !mobileMenuOpen"
+                class="md:hidden z-50 text-2xl focus:outline-none transition-colors duration-300"
+                :class="{'text-espresso': scrolled || mobileMenuOpen, 'text-white': !scrolled && !mobileMenuOpen}">
+                <i class="fa-solid" :class="mobileMenuOpen ? 'fa-xmark' : 'fa-bars'"></i>
+            </button>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div x-show="mobileMenuOpen" style="display: none;"
+            class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center gap-6 text-xl shadow-premium"
+            x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="opacity-0 -translate-y-full" x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-200 transform"
+            x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-full">
+
+            <a href="{{ url_for('home') }}" class="font-serif hover:text-gold transition-colors">Home</a>
+            <a href="{{ url_for('menu') }}" class="font-serif hover:text-gold transition-colors">Menu</a>
+            <a href="{{ url_for('gallery') }}" class="font-serif hover:text-gold transition-colors">Gallery</a>
+            <a href="{{ url_for('about') }}" class="font-serif hover:text-gold transition-colors">About</a>
+            <a href="{{ url_for('contact') }}" class="font-serif hover:text-gold transition-colors">Contact</a>
+            <a href="{{ url_for('order') }}" class="font-serif hover:text-gold transition-colors">Order Online</a>
+            <a href="{{ url_for('reservation') }}" class="btn-primary mt-4">Reserve Table</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-espresso text-cream pt-16 pb-8 border-t-[6px] border-gold">
+        <div class="container mx-auto px-6 lg:px-12 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+
+            <!-- Brand -->
+            <div class="col-span-1 md:col-span-1">
+                <h3 class="font-serif text-3xl font-bold mb-4">Mírame</h3>
+                <p class="text-cream/80 leading-relaxed mb-6">
+                    Where flavor meets comfort. Experience modern luxury with artisanal coffee and fine dining in a cozy
+                    ambiance.
+                </p>
+                <div class="flex gap-4">
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gold hover:text-espresso transition-all duration-300">
+                        <i class="fa-brands fa-instagram"></i>
+                    </a>
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gold hover:text-espresso transition-all duration-300">
+                        <i class="fa-brands fa-facebook-f"></i>
+                    </a>
+                    <a href="#"
+                        class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-gold hover:text-espresso transition-all duration-300">
+                        <i class="fa-brands fa-twitter"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Links -->
+            <div>
+                <h4 class="font-serif text-xl font-semibold mb-6 text-gold">Quick Links</h4>
+                <ul class="space-y-3">
+                    <li><a href="{{ url_for('home') }}"
+                            class="text-cream/80 hover:text-gold transition-colors inline-block transform hover:translate-x-1 duration-300">Home</a>
+                    </li>
+                    <li><a href="{{ url_for('about') }}"
+                            class="text-cream/80 hover:text-gold transition-colors inline-block transform hover:translate-x-1 duration-300">Our
+                            Story</a></li>
+                    <li><a href="{{ url_for('menu') }}"
+                            class="text-cream/80 hover:text-gold transition-colors inline-block transform hover:translate-x-1 duration-300">View
+                            Menu</a></li>
+                    <li><a href="{{ url_for('gallery') }}"
+                            class="text-cream/80 hover:text-gold transition-colors inline-block transform hover:translate-x-1 duration-300">Gallery</a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Contact -->
+            <div>
+                <h4 class="font-serif text-xl font-semibold mb-6 text-gold">Contact Us</h4>
+                <ul class="space-y-4 text-cream/80">
+                    <li class="flex items-start gap-3">
+                        <i class="fa-solid fa-location-dot mt-1 text-gold"></i>
+                        <span>123 Luxury Avenue,<br>Metro Hub, City 400001</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <i class="fa-solid fa-phone text-gold"></i>
+                        <span>+91 98765 43210</span>
+                    </li>
+                    <li class="flex items-center gap-3">
+                        <i class="fa-solid fa-envelope text-gold"></i>
+                        <span>hello@miramecafe.com</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Open Hours -->
+            <div>
+                <h4 class="font-serif text-xl font-semibold mb-6 text-gold">Opening Hours</h4>
+                <ul class="space-y-3 text-cream/80">
+                    <li class="flex justify-between border-b border-cream/20 pb-2">
+                        <span>Mon - Fri</span>
+                        <span>10:00 AM - 11:00 PM</span>
+                    </li>
+                    <li class="flex justify-between border-b border-cream/20 pb-2">
+                        <span>Sat - Sun</span>
+                        <span>09:00 AM - 12:00 AM</span>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+
+        <div class="container mx-auto px-6 pt-8 border-t border-cream/20 text-center text-sm text-cream/60">
+            <p>&copy; 2026 Mírame Cafe & Kitchen. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Main JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
