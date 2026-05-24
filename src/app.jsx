@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, NavLink, useLocation } from 'react-router-dom';
 import ScrollReveal from 'scrollreveal';
 
 import Home from './pages/home.jsx';
@@ -15,6 +15,64 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const location = useLocation();
+
+  // Global cart state with localStorage persistence
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('mirame_cart');
+      return savedCart ? JSON.parse(savedCart) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mirame_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // Cart operations
+  const addToCart = (item) => {
+    setCart((prev) => {
+      const quantity = (prev[item.id]?.quantity || 0) + 1;
+      return {
+        ...prev,
+        [item.id]: { ...item, quantity }
+      };
+    });
+    addToast(`${item.name} added to cart.`, 'success');
+  };
+
+  const removeFromCart = (item) => {
+    setCart((prev) => {
+      if (!prev[item.id]) return prev;
+      const quantity = prev[item.id].quantity - 1;
+      if (quantity <= 0) {
+        const newCart = { ...prev };
+        delete newCart[item.id];
+        return newCart;
+      }
+      return {
+        ...prev,
+        [item.id]: { ...item, quantity }
+      };
+    });
+  };
+
+  const deleteFromCart = (itemId) => {
+    const itemName = cart[itemId]?.name || "Item";
+    setCart((prev) => {
+      const newCart = { ...prev };
+      delete newCart[itemId];
+      return newCart;
+    });
+    addToast(`${itemName} removed from cart.`, 'info');
+  };
+
+  const clearCart = () => {
+    setCart({});
+  };
+
+  const cartItemCount = Object.values(cart).reduce((acc, item) => acc + item.quantity, 0);
 
   // Scroll logic for Navbar
   useEffect(() => {
@@ -116,12 +174,19 @@ export default function App() {
 
           {/* Desktop Menu */}
           <nav className="hidden md:flex items-center gap-8 font-medium">
-            <Link to="/" className={`nav-link hover:text-gold transition-colors duration-300 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>Home</Link>
-            <Link to="/menu" className={`nav-link hover:text-gold transition-colors duration-300 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>Menu</Link>
-            <Link to="/gallery" className={`nav-link hover:text-gold transition-colors duration-300 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>Gallery</Link>
-            <Link to="/about" className={`nav-link hover:text-gold transition-colors duration-300 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>About</Link>
-            <Link to="/contact" className={`nav-link hover:text-gold transition-colors duration-300 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>Contact</Link>
-            <Link to="/order" className={`nav-link hover:text-gold transition-colors duration-300 md:mr-4 ${scrolled ? 'text-espresso' : 'text-white/90'}`}>Order Online</Link>
+            <NavLink to="/" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>Home</NavLink>
+            <NavLink to="/menu" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>Menu</NavLink>
+            <NavLink to="/gallery" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>Gallery</NavLink>
+            <NavLink to="/about" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>About</NavLink>
+            <NavLink to="/contact" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>Contact</NavLink>
+            <NavLink to="/order" className={({ isActive }) => `nav-link hover:text-gold transition-colors duration-300 md:mr-4 flex items-center gap-1.5 ${isActive ? 'text-gold font-semibold' : (scrolled ? 'text-espresso' : 'text-white/90')}`}>
+              Order Online
+              {cartItemCount > 0 && (
+                <span className="bg-gold text-espresso font-bold text-xs w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {cartItemCount}
+                </span>
+              )}
+            </NavLink>
             <Link to="/reservation" className="btn-primary transition-all duration-300">Reserve Table</Link>
           </nav>
 
@@ -139,12 +204,19 @@ export default function App() {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center gap-6 text-xl shadow-premium animate-fadeIn">
-            <Link to="/" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">Home</Link>
-            <Link to="/menu" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">Menu</Link>
-            <Link to="/gallery" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">Gallery</Link>
-            <Link to="/about" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">About</Link>
-            <Link to="/contact" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">Contact</Link>
-            <Link to="/order" onClick={() => setMobileMenuOpen(false)} className="font-serif hover:text-gold transition-colors">Order Online</Link>
+            <NavLink to="/" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>Home</NavLink>
+            <NavLink to="/menu" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>Menu</NavLink>
+            <NavLink to="/gallery" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>Gallery</NavLink>
+            <NavLink to="/about" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>About</NavLink>
+            <NavLink to="/contact" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>Contact</NavLink>
+            <NavLink to="/order" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `font-serif hover:text-gold transition-colors flex items-center gap-2 ${isActive ? 'text-gold font-bold scale-105' : 'text-espresso'}`}>
+              Order Online
+              {cartItemCount > 0 && (
+                <span className="bg-gold text-espresso font-bold text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {cartItemCount}
+                </span>
+              )}
+            </NavLink>
             <Link to="/reservation" onClick={() => setMobileMenuOpen(false)} className="btn-primary mt-4">Reserve Table</Link>
           </div>
         )}
@@ -155,11 +227,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
-          <Route path="/menu" element={<Menu />} />
+          <Route path="/menu" element={<Menu cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} />} />
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/contact" element={<Contact addToast={addToast} />} />
           <Route path="/reservation" element={<Reservation addToast={addToast} />} />
-          <Route path="/order" element={<Order addToast={addToast} />} />
+          <Route path="/order" element={<Order cart={cart} addToCart={addToCart} removeFromCart={removeFromCart} deleteFromCart={deleteFromCart} clearCart={clearCart} addToast={addToast} />} />
         </Routes>
       </main>
 
