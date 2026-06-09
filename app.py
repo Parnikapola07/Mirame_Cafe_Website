@@ -1,74 +1,36 @@
 import os
+import json
 from flask import Flask, request
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
-# Initialize Flask App
-app = Flask(__name__)
+# Initialize Flask App (configured to serve React's built static files from 'dist')
+app = Flask(__name__, static_folder='dist', static_url_path='/')
 app.config['SECRET_KEY'] = 'mirame_cafe_secret_key_2026'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cafe.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+# --- JSON Data Files Storage Path ---
+# If running on Render with persistent disk mounted at /data, use that.
+# Otherwise, fall back to the current directory for local development.
+DATA_DIR = '/data' if os.path.exists('/data') else os.getcwd()
+RESERVATIONS_FILE = os.path.join(DATA_DIR, 'reservations.json')
+ORDERS_FILE = os.path.join(DATA_DIR, 'orders.json')
 
-# --- Database Models ---
-
-class Reservation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    phone = db.Column(db.String(20), nullable=False)
-    guests = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.String(20), nullable=False)
-    time = db.Column(db.String(20), nullable=False)
-    special_request = db.Column(db.Text, nullable=True)
-    table_number = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __init__(self, name, phone, guests, date, time, special_request=None, table_number=None):
-        self.name = name
-        self.phone = phone
-        self.guests = guests
-        self.date = date
-        self.time = time
-        self.special_request = special_request
-        self.table_number = table_number
-
-    def __repr__(self):
-        return f'<Reservation {self.name} on {self.date} at {self.time} (Table {self.table_number})>'
-
-
-class Order(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    item = db.Column(db.Text, nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    phone = db.Column(db.String(20), nullable=False)
-    address = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __init__(self, item, quantity, name, phone, address):
-        self.item = item
-        self.quantity = quantity
-        self.name = name
-        self.phone = phone
-        self.address = address
-
-    def __repr__(self):
-        return f'<Order {self.quantity}x {self.item} for {self.name}>'
-
-
-# Create the database tables
-with app.app_context():
-    db.create_all()
-    # Migration: Add table_number column to reservation table if it doesn't exist
+def load_data(filepath):
+    if not os.path.exists(filepath):
+        return []
     try:
-        db.session.execute(db.text("ALTER TABLE reservation ADD COLUMN table_number INTEGER"))
-        db.session.commit()
+        with open(filepath, 'r', encoding='utf-8') as f:
+            return json.load(f)
     except Exception:
-        db.session.rollback()
+        return []
 
+def save_data(filepath, data):
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"Error saving data to {filepath}: {e}")
 
-# --- Routes ---
+# --- API Routes ---
 
 @app.route('/api/reservation/availability', methods=['GET'])
 def api_reservation_availability():
@@ -83,10 +45,13 @@ def api_reservation_availability():
     availability = {slot: 10 for slot in slots}
     
     # Query reservations for this date
-    reservations = Reservation.query.filter_by(date=date).all()
+    all_res = load_data(RESERVATIONS_FILE)
+    reservations = [res for res in all_res if res.get('date') == date]
+    
     for res in reservations:
-        if res.time in availability:
-            availability[res.time] = max(0, availability[res.time] - 1)
+        res_time = res.get('time')
+        if res_time in availability:
+            availability[res_time] = max(0, availability[res_time] - 1)
             
     return availability, 200
 
@@ -97,8 +62,9 @@ def api_reservation_booked_tables():
     if not date or not time:
         return {'status': 'error', 'message': 'Date and time parameters are required'}, 400
     
-    reservations = Reservation.query.filter_by(date=date, time=time).all()
-    booked = [res.table_number for res in reservations if res.table_number is not None]
+    all_res = load_data(RESERVATIONS_FILE)
+    reservations = [res for res in all_res if res.get('date') == date and res.get('time') == time]
+    booked = [res.get('table_number') for res in reservations if res.get('table_number') is not None]
     return {'booked_tables': booked}, 200
 
 @app.route('/api/reservation', methods=['POST'])
@@ -116,7 +82,8 @@ def api_reservation():
     if time not in slots:
         return {'status': 'error', 'message': 'Invalid time slot'}, 400
         
-    existing_count = Reservation.query.filter_by(date=date, time=time).count()
+    all_res = load_data(RESERVATIONS_FILE)
+    existing_count = sum(1 for r in all_res if r.get('date') == date and r.get('time') == time)
     if existing_count >= 10:
         return {'status': 'error', 'message': 'No tables available for this time slot'}, 400
         
@@ -126,26 +93,36 @@ def api_reservation():
         try:
             table_number_int = int(table_number)
             # Check if this table is already booked for this slot
-            existing_table = Reservation.query.filter_by(date=date, time=time, table_number=table_number_int).first()
+            existing_table = next((r for r in all_res if r.get('date') == date and r.get('time') == time and r.get('table_number') == table_number_int), None)
             if existing_table:
                 return {'status': 'error', 'message': f'Table {table_number} is already booked for this time slot.'}, 400
         except ValueError:
             return {'status': 'error', 'message': 'Invalid table number format'}, 400
     else:
         # Fallback: Auto-assign first available table number
-        booked_tables = [r.table_number for r in Reservation.query.filter_by(date=date, time=time).all() if r.table_number is not None]
+        booked_tables = [r.get('table_number') for r in all_res if r.get('date') == date and r.get('time') == time and r.get('table_number') is not None]
         available_tables = [t for t in range(1, 11) if t not in booked_tables]
         if not available_tables:
             return {'status': 'error', 'message': 'No tables available for this time slot'}, 400
         table_number_int = available_tables[0]
     
-    new_reservation = Reservation(
-        name=name, phone=phone, guests=int(guests), 
-        date=date, time=time, special_request=special_request,
-        table_number=table_number_int
-    )
-    db.session.add(new_reservation)
-    db.session.commit()
+    # Generate new unique ID
+    next_id = max([r.get('id', 0) for r in all_res] or [0]) + 1
+    
+    new_reservation = {
+        'id': next_id,
+        'name': name,
+        'phone': phone,
+        'guests': int(guests) if guests else 0,
+        'date': date,
+        'time': time,
+        'special_request': special_request,
+        'table_number': table_number_int,
+        'created_at': datetime.utcnow().isoformat()
+    }
+    
+    all_res.append(new_reservation)
+    save_data(RESERVATIONS_FILE, all_res)
     return {'status': 'success'}, 200
 
 @app.route('/api/order', methods=['POST'])
@@ -156,18 +133,38 @@ def api_order():
     phone = request.form.get('phone')
     address = request.form.get('address')
     
-    new_order = Order(
-        item=item, quantity=quantity, name=name, 
-        phone=phone, address=address
-    )
-    db.session.add(new_order)
-    db.session.commit()
+    all_orders = load_data(ORDERS_FILE)
+    next_id = max([o.get('id', 0) for o in all_orders] or [0]) + 1
+    
+    new_order = {
+        'id': next_id,
+        'item': item,
+        'quantity': int(quantity) if quantity else 0,
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'created_at': datetime.utcnow().isoformat()
+    }
+    
+    all_orders.append(new_order)
+    save_data(ORDERS_FILE, all_orders)
     return {'status': 'success'}, 200
 
 @app.route('/api/contact', methods=['POST'])
 def api_contact():
     # Currently just mock contact submission
     return {'status': 'success'}, 200
+
+# --- Catch-All Route for Frontend SPA Routing ---
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    # If the path matches any API endpoint but is not a registered route, return 404
+    if path.startswith('api/'):
+        return {'status': 'error', 'message': 'API endpoint not found'}, 404
+    # Otherwise, serve the React app's index.html file
+    return app.send_static_file('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

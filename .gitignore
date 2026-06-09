@@ -10,3 +10,7 @@ instance/
 .venv/
 env/
 venv/
+
+# Data Files
+reservations.json
+orders.json
